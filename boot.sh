@@ -27,6 +27,12 @@ if [ -d "$V" ]; then
   fi
 fi
 
+# --- 1b. expose a volume folder as ComfyUI input subfolder "vol" (LoadImage: "vol/<file>") -------
+VOL_INPUT=${VOLUME_INPUT_DIR:-$V/runpod-slim/ComfyUI/input}
+if [ -d "$VOL_INPUT" ]; then
+  mkdir -p /comfyui/input && ln -sfn "$VOL_INPUT" /comfyui/input/vol && echo "[boot] /comfyui/input/vol -> $VOL_INPUT"
+fi
+
 # --- 2. custom node python deps ---------------------------------------------------------
 if [ -d "$NODE_ROOT" ] && [ "${SKIP_NODE_DEPS:-0}" != "1" ]; then
   export UV_CACHE_DIR=$V/.uv-cache
