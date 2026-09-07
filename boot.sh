@@ -11,13 +11,15 @@
 #   4. Hand over to the image's normal /start.sh.
 set -u
 V=/runpod-volume
+# the image ships wget but not curl
+fetch() { wget -qO "$2" "$1" 2>/dev/null || curl -fsSL "$1" -o "$2"; }
 REPO_RAW=${BOOT_REPO_RAW:?set BOOT_REPO_RAW to the raw GitHub URL of this repo}
 echo "[boot] $(date -u +%FT%TZ) starting; volume mounted: $([ -d $V ] && echo yes || echo NO)"
 
 # --- 1. model / custom node paths -------------------------------------------------------
 NODE_ROOT=${CUSTOM_NODES_DIR:-$V/custom_nodes}
 if [ -d "$V" ]; then
-  if curl -fsSL "$REPO_RAW/extra_model_paths.append.yaml" -o /tmp/extra.yaml; then
+  if fetch "$REPO_RAW/extra_model_paths.append.yaml" /tmp/extra.yaml; then
     sed -i '/^# >>> comfy-runpod boot/,$d' /comfyui/extra_model_paths.yaml
     { echo "# >>> comfy-runpod boot"; sed "s#__NODE_ROOT__#${NODE_ROOT}#g" /tmp/extra.yaml; } >> /comfyui/extra_model_paths.yaml
     echo "[boot] extra_model_paths.yaml updated (custom_nodes -> $NODE_ROOT)"
@@ -38,7 +40,7 @@ if [ -d "$NODE_ROOT" ] && [ "${SKIP_NODE_DEPS:-0}" != "1" ]; then
 fi
 
 # --- 3. extended handler ----------------------------------------------------------------
-if curl -fsSL "$REPO_RAW/handler_ext.py" -o /handler_ext.py; then
+if fetch "$REPO_RAW/handler_ext.py" /handler_ext.py; then
   sed -i 's#/handler.py#/handler_ext.py#g' /start.sh
   echo "[boot] handler_ext installed"
 else

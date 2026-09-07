@@ -8,7 +8,7 @@ the normal workflow handler.
 
 Endpoint settings:
 
-- Start command: `bash -c "curl -fsSL $BOOT_REPO_RAW/boot.sh -o /boot.sh && bash /boot.sh"`
+- Start command: `bash -c "wget -qO /boot.sh $BOOT_REPO_RAW/boot.sh && bash /boot.sh"`
 - Environment: `BOOT_REPO_RAW=https://raw.githubusercontent.com/<user>/<repo>/main`
 
 No secrets live here; tokens are passed per request.
