@@ -11,10 +11,13 @@ Volume management ops (relative paths resolve against /runpod-volume):
              "hf_token": "...", "civitai_token": "..."}}
   {"input": {"op": "clone", "repo": "https://github.com/owner/pack", "ref": "main"}}   # into custom_nodes/
   {"input": {"op": "rm", "path": "models/loras/x.safetensors", "recursive": false}}
+  {"input": {"op": "stage", "path": "runpod-slim/ComfyUI/input/x.png", "name": "x.png"}}  # copy into /comfyui/input
+  {"input": {"op": "put", "path": "models/loras/x.safetensors", "data_b64": "...", "append": true}}  # chunked upload
 """
 import os
 import sys
 import time
+import base64
 import shutil
 import hashlib
 import subprocess
@@ -194,7 +197,31 @@ def op_models(inp):
         os.chdir(cwd)
 
 
-OPS = {"ls": op_ls, "df": op_df, "download": op_download, "clone": op_clone, "rm": op_rm, "models": op_models}
+def op_stage(inp):
+    """Copy a file from the volume into ComfyUI's input directory so LoadImage can reference it by name."""
+    src = _abs(inp.get("path"))
+    if not os.path.isfile(src):
+        return {"error": "not found", "path": src}
+    name = inp.get("name") or os.path.basename(src)
+    dest = os.path.join("/comfyui/input", os.path.basename(name))
+    shutil.copyfile(src, dest)
+    return {"staged": dest, "size": os.path.getsize(dest)}
+
+
+def op_put(inp):
+    """Write base64 data to a volume path; with append=true, chunks can be sent in several requests."""
+    dest = _abs(inp.get("path"))
+    if not dest.startswith(VOLUME + "/"):
+        return {"error": "path must be on the network volume"}
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    data = base64.b64decode(inp.get("data_b64") or "")
+    mode = "ab" if inp.get("append") else "wb"
+    with open(dest, mode) as fh:
+        fh.write(data)
+    return {"path": dest, "written": len(data), "size": os.path.getsize(dest)}
+
+
+OPS = {"stage": op_stage, "put": op_put, "ls": op_ls, "df": op_df, "download": op_download, "clone": op_clone, "rm": op_rm, "models": op_models}
 
 
 def handler(job):
