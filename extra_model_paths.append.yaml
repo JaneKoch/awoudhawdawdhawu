@@ -1,0 +1,44 @@
+# appended by boot.sh; __NODE_ROOT__ is substituted with the custom node dir
+comfy_runpod_volume:
+  base_path: /runpod-volume/models
+  checkpoints: checkpoints/
+  clip: clip/
+  clip_vision: clip_vision/
+  configs: configs/
+  controlnet: controlnet/
+  diffusion_models: diffusion_models/
+  embeddings: embeddings/
+  gligen: gligen/
+  hypernetworks: hypernetworks/
+  loras: loras/
+  photomaker: photomaker/
+  sams: sams/
+  style_models: style_models/
+  text_encoders: text_encoders/
+  ultralytics: ultralytics/
+  ultralytics_bbox: ultralytics/bbox/
+  ultralytics_segm: ultralytics/segm/
+  unet: unet/
+  upscale_models: upscale_models/
+  vae: vae/
+  vae_approx: vae_approx/
+comfy_runpod_volume_ComfyUI:
+  base_path: /runpod-volume/ComfyUI/models
+  checkpoints: checkpoints/
+  clip: clip/
+  clip_vision: clip_vision/
+  controlnet: controlnet/
+  diffusion_models: diffusion_models/
+  embeddings: embeddings/
+  loras: loras/
+  sams: sams/
+  text_encoders: text_encoders/
+  ultralytics: ultralytics/
+  ultralytics_bbox: ultralytics/bbox/
+  ultralytics_segm: ultralytics/segm/
+  unet: unet/
+  upscale_models: upscale_models/
+  vae: vae/
+comfy_runpod_nodes:
+  base_path: __NODE_ROOT__
+  custom_nodes: ./
