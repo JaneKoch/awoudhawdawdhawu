@@ -6,7 +6,7 @@
 #
 # Steps (idempotent, run on every cold start):
 #   1. Add the network volume's model and custom_nodes folders to ComfyUI's search paths.
-#   2. Install python requirements of custom nodes found on the volume (uv cache kept on the volume).
+#   2. Install python requirements of custom nodes found on the volume (into the image venv, local cache).
 #   3. Install the extended handler (volume management ops next to the normal workflow handler).
 #   4. Hand over to the image's normal /start.sh.
 set -u
@@ -35,13 +35,13 @@ fi
 
 # --- 2. custom node python deps ---------------------------------------------------------
 if [ -d "$NODE_ROOT" ] && [ "${SKIP_NODE_DEPS:-0}" != "1" ]; then
-  export UV_CACHE_DIR=$V/.uv-cache
-  mkdir -p "$UV_CACHE_DIR"
+  # cache stays on the container's local disk: a cache on the network volume is far too slow
   t0=$(date +%s)
   for req in "$NODE_ROOT"/*/requirements.txt; do
     [ -f "$req" ] || continue
     [ -f "$(dirname "$req")/.disabled" ] && continue
-    uv pip install -q -r "$req" 2>&1 | grep -v -E '^\s*$' | tail -n 5 || true
+    echo "[boot] deps: $req"
+    uv pip install --no-progress -r "$req" 2>&1 | tail -n 3 || true
   done
   echo "[boot] custom node deps checked in $(( $(date +%s) - t0 ))s"
 fi
