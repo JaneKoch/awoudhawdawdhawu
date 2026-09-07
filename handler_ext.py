@@ -13,6 +13,12 @@ Volume management ops (relative paths resolve against /runpod-volume):
   {"input": {"op": "rm", "path": "models/loras/x.safetensors", "recursive": false}}
   {"input": {"op": "stage", "path": "runpod-slim/ComfyUI/input/x.png", "name": "x.png"}}  # copy into /comfyui/input
   {"input": {"op": "put", "path": "models/loras/x.safetensors", "data_b64": "...", "append": true}}  # chunked upload
+  {"input": {"op": "cat", "path": "/sys/fs/cgroup/memory.max"}}   # read a small text file (debugging)
+
+Between workflow jobs that reference a different set of model files, ComfyUI is told to unload models
+and clear its cache (POST /free). Serverless containers have a memory cgroup limit far below host RAM,
+and ComfyUI's RAM-pressure cache only looks at host RAM, so offloaded weights of several model families
+would otherwise pile up until the kernel OOM-kills ComfyUI. Set FREE_ON_MODEL_CHANGE=0 to disable.
 """
 import os
 import sys
@@ -197,6 +203,26 @@ def op_models(inp):
         os.chdir(cwd)
 
 
+def op_cat(inp):
+    p = inp.get("path") or ""
+    if not os.path.isfile(p):
+        return {"error": "not a file", "path": p}
+    with open(p, "rb") as fh:
+        data = fh.read(int(inp.get("max_bytes", 65536)))
+    return {"path": p, "text": data.decode("utf-8", "replace")}
+
+
+def _cgroup_mem():
+    out = {}
+    for name in ("memory.max", "memory.current", "memory.events"):
+        try:
+            with open(f"/sys/fs/cgroup/{name}") as fh:
+                out[name] = fh.read().strip()
+        except OSError:
+            pass
+    return out
+
+
 def op_stage(inp):
     """Copy a file from the volume into ComfyUI's input directory so LoadImage can reference it by name."""
     src = _abs(inp.get("path"))
@@ -221,12 +247,40 @@ def op_put(inp):
     return {"path": dest, "written": len(data), "size": os.path.getsize(dest)}
 
 
-OPS = {"stage": op_stage, "put": op_put, "ls": op_ls, "df": op_df, "download": op_download, "clone": op_clone, "rm": op_rm, "models": op_models}
+OPS = {"stage": op_stage, "put": op_put, "cat": op_cat, "ls": op_ls, "df": op_df, "download": op_download, "clone": op_clone, "rm": op_rm, "models": op_models}
+
+
+_last_models = None
+
+
+def _models_in(workflow):
+    names = set()
+    for node in (workflow or {}).values():
+        for v in (node.get("inputs") or {}).values():
+            if isinstance(v, str) and v.lower().endswith(MODEL_EXT):
+                names.add(v)
+            elif isinstance(v, dict) and isinstance(v.get("lora"), str):
+                names.add(v["lora"])
+    return names
+
+
+def _comfy_free():
+    try:
+        r = requests.post("http://127.0.0.1:8188/free", json={"unload_models": True, "free_memory": True}, timeout=30)
+        print(f"comfy-runpod - asked ComfyUI to unload models / free cache: HTTP {r.status_code}; cgroup {_cgroup_mem()}")
+    except Exception as e:  # noqa: BLE001
+        print(f"comfy-runpod - /free failed: {e!r}")
 
 
 def handler(job):
+    global _last_models
     inp = job.get("input") or {}
     op = inp.get("op")
+    if not op and isinstance(inp.get("workflow"), dict) and os.environ.get("FREE_ON_MODEL_CHANGE", "1") != "0":
+        models = _models_in(inp["workflow"])
+        if _last_models is not None and models != _last_models:
+            _comfy_free()
+        _last_models = models
     if op:
         fn = OPS.get(op)
         if not fn:
