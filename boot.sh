@@ -19,6 +19,8 @@ echo "[boot] $(date -u +%FT%TZ) starting; volume mounted: $([ -d $V ] && echo ye
 # --- 1. model / custom node paths -------------------------------------------------------
 NODE_ROOT=${CUSTOM_NODES_DIR:-$V/custom_nodes}
 if [ -d "$V" ]; then
+  mkdir -p "$NODE_ROOT"
+  mkdir -p "$NODE_ROOT"
   if fetch "$REPO_RAW/extra_model_paths.append.yaml" /tmp/extra.yaml; then
     sed -i '/^# >>> comfy-runpod boot/,$d' /comfyui/extra_model_paths.yaml
     { echo "# >>> comfy-runpod boot"; sed "s#__NODE_ROOT__#${NODE_ROOT}#g" /tmp/extra.yaml; } >> /comfyui/extra_model_paths.yaml
